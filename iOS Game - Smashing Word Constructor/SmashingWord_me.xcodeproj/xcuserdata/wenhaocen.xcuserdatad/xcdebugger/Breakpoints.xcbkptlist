@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Bucket
+   type = "1"
+   version = "1.0">
+   <FileBreakpoints>
+      <FileBreakpoint
+         shouldBeEnabled = "No"
+         ignoreCount = "0"
+         continueAfterRunningActions = "No"
+         filePath = "Tests/GHUnitCocos2dBase.m"
+         timestampString = "389271449.791869"
+         startingColumnNumber = "9223372036854775807"
+         endingColumnNumber = "9223372036854775807"
+         startingLineNumber = "306"
+         endingLineNumber = "306"
+         landmarkName = "-testSingle_FetchBackendSampleData"
+         landmarkType = "5">
+      </FileBreakpoint>
+      <FileBreakpoint
+         shouldBeEnabled = "No"
+         ignoreCount = "0"
+         continueAfterRunningActions = "No"
+         filePath = "Tests/GHUnitCocos2dBase.m"
+         timestampString = "389269114.33341"
+         startingColumnNumber = "9223372036854775807"
+         endingColumnNumber = "9223372036854775807"
+         startingLineNumber = "296"
+         endingLineNumber = "296"
+         landmarkName = "-testSingle_FetchBackendSampleData"
+         landmarkType = "5">
+      </FileBreakpoint>
+      <FileBreakpoint
+         shouldBeEnabled = "No"
+         ignoreCount = "0"
+         continueAfterRunningActions = "No"
+         filePath = "Tests_Multiplayer/GHUnitCocos2dBase_Multiplayer.m"
+         timestampString = "389277970.980704"
+         startingColumnNumber = "9223372036854775807"
+         endingColumnNumber = "9223372036854775807"
+         startingLineNumber = "397"
+         endingLineNumber = "397"
+         landmarkName = "-testMultiple_saveScoreAndThenFetch"
+         landmarkType = "5">
+      </FileBreakpoint>
+      <FileBreakpoint
+         shouldBeEnabled = "No"
+         ignoreCount = "0"
+         continueAfterRunningActions = "No"
+         filePath = "Tests_Multiplayer/GHUnitCocos2dBase_Multiplayer.m"
+         timestampString = "389277970.980704"
+         startingColumnNumber = "9223372036854775807"
+         endingColumnNumber = "9223372036854775807"
+         startingLineNumber = "399"
+         endingLineNumber = "399"
+         landmarkName = "-testMultiple_saveScoreAndThenFetch"
+         landmarkType = "5">
+      </FileBreakpoint>
+   </FileBreakpoints>
+</Bucket>

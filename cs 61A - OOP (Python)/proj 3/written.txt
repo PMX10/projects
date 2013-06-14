@@ -1,0 +1,17 @@
+Write your answers to written problems here.
+
+
+1.1)simulate() in AntColony class
+
+
+
+1.2)Since "Hive" is inherited from "Place" class, "strategy" function provides the first movement of the bees to "move_to" another "entrance" which is randomly selected from the "exits" list.
+
+
+1.3)Modify the "length" and "tunnels" parameters in the 
+layout functions
+
+
+
+1.4)
+"Insects armor" represents the life of the insect. The insect "dies" as long as the armor reaches 0.

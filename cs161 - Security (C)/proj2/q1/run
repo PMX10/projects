@@ -1,0 +1,12 @@
+#!/bin/bash
+count=0
+while [ 0 -eq 0 ]
+do
+./generate_rsa_pair $count
+if diff server_pubkey.pub q1_pubkey.pub >/dev/null ; then
+	cat q1_privkey.priv
+	break
+fi
+let "count += 1"
+
+done

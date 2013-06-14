@@ -1,0 +1,16 @@
+A description of your cache blocking strategy (max 200 words)
+In the cache blocking strategy, we tried 3 ways to od the cache blocking matrix multiplication.
+The first way we tried was to use a fixed block size of 64x64. We made this as the first because we believed that this way should be the slowest amoung the 3 ways we were going to used. We believed it should give the worst performance because in the worst case, it remains 63 rows/columns which can not be block. Obviously, it is the most time consuming to solve the fringes of matrices.
+The second way was to reduce the block size to 32x32. Althought it requires more calculations on the block multiplication, however, the time requires to solve the fringes will be significantly reduced due to the size of the remained rows/columns are only half of those from block size equal to 64. 
+The third way was to use different block sizes coresponding to different matrix sizes. We analyzed in this way that it would provide a more efficient algorithm. It should give the maximum speed for those matrixes which can be evenly divided by the block size (for example, 128x128 matrix uses 64x64 block, 160x160 matrix uses 32x32 block). 
+After tyring all these methods, we supprisingly observed that they are almost at the same speed. The 32x32 block size ran slightly faster than others on average.
+
+
+A description of your parallelization strategy (max 200 words)
+In paralleliztion strategy, we put parallel computing on block calculations (calculate different blocks simultanously). We tested different number of threads, 8, 16, and 32. It results the one with 8 threads gives the fastest speed. It is reasonable because 8 threads are fully loaded on our 4-core workstation in the lab.
+
+
+
+A plot showing the speedup of sgemm-all.c over sgemm-naive.c for values of N between 64 and 1024
+A weak scaling plot of sgemm-openmp.c vs. sgemm-all.c
+A strong scaling plot of sgemm-openmp.c vs sgemm-all.c

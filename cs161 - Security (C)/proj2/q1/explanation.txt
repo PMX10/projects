@@ -1,0 +1,36 @@
+a)
+First, we discovered the exploit in the generate_rsa_pair.c. 
+The line 147, seed = time_micro_sec >> 7; did not add the 
+number of milli-seconds to the number of seconds since epoc.
+It ended up just using the milli-seconds as the seed, which has
+a maximum of 2^25 possibilities. 
+Therefore, the number of possibilities for the seed decreased 
+drastically and is limited enough for us to brute force it. 
+We wrote a script and modified the generate_rsa_pair.c so that 
+it takes in an argument for seed and generates a public and private
+key. We then compare the generated public key with the server's 
+public key. If both public keys matches, we will stop running the 
+script and the corresponding private key that we currently have will
+be the private key for the server's public key as well. 
+We execute wireshark and start the connection with eth0. 
+-select ‘Edit’ -> ‘Preferences’ 
+-Then select ‘Protocols’ -> ‘SSL’
+-Under RSA keys list, click on ‘Edit’ 
+-Click on ‘New’ 
+-Enter the destination IP address: 172.16.23.111
+-Enter the Port: 443
+-Enter the Protocol: http
+-Key File: select the file, q0_privkey.priv, containing the private key
+-Click ‘Apply’ -> ‘OK’ and go back to the opened q0.pcap on wireshark
+-Right click on the row with the info “HTTP/1.0 200 ok (text/plain) and select ‘Follow SSL Stream’ 
+-A new window will pop up and shows the decrypted secret 
+Using the private key, q1_privkey.priv, as the decryptor, similar to the procedure in part (a), we are able to read the chat log in plain text. 
+
+b)
+The line number that does not do what the comment above states is in
+line 147, seed = time_micro_sec >> 7; 
+The correct code should be seed += time_micro_sec >> 7; 
+Fixing this line will make the key generation scheme secure. It will
+drastically improve the limits and randomness of the seeding, casuing
+brute forcing by the attacker to be almost impossible. 
+ 

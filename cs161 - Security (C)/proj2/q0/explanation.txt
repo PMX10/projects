@@ -1,0 +1,29 @@
+a)
+-open up the terminal 
+-run ‘wireshark’
+-Click on ‘Open File’, then select the file with the encrypted message, q0.pcap
+-After opening the file, select ‘Edit’ -> ‘Preferences’ 
+-Then select ‘Protocols’ -> ‘SSL’
+-Under RSA keys list, click on ‘Edit’ 
+-Click on ‘New’ 
+-Enter the destination IP address: 172.16.23.205
+-Enter the Port: 443
+-Enter the Protocol: http
+-Key File: select the file, q0_privkey.priv, containing the private key
+-Click ‘Apply’ -> ‘OK’ and go back to the opened q0.pcap on wireshark
+-Right click on the row with the info “HTTP/1.0 200 ok (text/plain) and select ‘Follow SSL Stream’ 
+-A new window will pop up and shows the decrypted secret 
+
+b)
+Cipher Suite: TLS_RSA_WITH_AES_256_CBC_SHA  
+The Handshake Protocol for Server Hello used TLS_RSA_WITH_AES_256_CBC_SHA for encryption. 
+
+RSA: 
+Premaster Secret is encrypted using RSA. 
+
+c) 
+Instead of encrypting using RSA, if the victim uses Diffie-Hellman key exchange, the attacker will 
+not be able to decrypt the message even if he has the private key. For Diffie-Hellman key exchange, 
+the private keys are discarded at the end of every session. Therefore, even if the attacker has the 
+private key of one party, if the encrypted message is from a different session from the obtained private 
+key, the private key is still not able to decrypt the message. 

@@ -1,0 +1,92 @@
+1. Run your code on hollywood.sequ with denom=100000 on clusters of size 6, 9, and 12. How long does each take? How many searches did each perform? How many reducers did you use for each? (Read the rest of the questions to see what other data you will need)
+
+6 clusters took 92 minutes and 18 seconds, 15 searches, 20 reducers.
+
+9 clusters took 34 minutes and 40 seconds, 9 searches, 20 reducers.
+
+12 clusters took 19 minutes and 15 seconds, 7 searches, 20 reducers.
+
+
+
+
+
+2. For the Hollywood dataset, at what distance are the 50th, 90th, and 95 percentiles?
+6 clusters:
+distance in 50th percentiles = 6847366
+distance in 90th percentiles = 12325258
+distance in 95th percentiles = 14415506
+
+9 clusters:
+distance in 50th percentiles = 4811067
+distance in 90th percentiles = 8659921
+distance in 95th percentiles = 9141027
+
+12 clusters:
+distance in 50th percentiles = 3207381
+distance in 90th percentiles = 5773286
+distance in 95th percentiles = 6094024
+
+
+
+
+3. What was the mean processing rate (MB/s) for 6, 9, and 12 instances? You can approximate the data size to be (input size) * (# of searches).
+6 clusters = (2788424629*15/1000000)MB / 5538s = 7.5526 MB/s 
+9 clusters = (2788423494*9/1000000)MB / 2080s =  12.0653 MB/s
+12 clusters = (2788423344*7/1000000)MB / 1155s = 16.8995 MB/s
+
+
+
+
+
+4. What was the speedup for 9 and 12 instances relative to 6 instances? What do you conclude about how well Hadoop parallelizes your work? Is this a case of strong scaling or weak scaling? Why or why not?
+speedup for 9 instances to 6 instances = 12.0653 MB/s / 7.5526MB/s = 1.597
+speedup for 12 instances to 6 instances = 16.8995 MB/s / 7.5526MB/s = 2.238
+
+By comparing the mean processing rate above, we can see that 9 instance is about 1.6 times faster than 6 instances, and 12 instance is about 2.24 times faster than 6 instances. According to the data, we believe that Hadoop parallelizes the work very well because the processing rate was more than doubled when we double the size of the clusters. However, we thought this scaling is strong because the amount of data need to be processed was large enough to fully test the hadoop performance.
+
+
+
+
+5. What is the purpose of including the combiner in the histogram skeleton code? Does its inclusion affect performance much? Why or why not? Could you have used a combiner in your other mapreduces? Why or why not?
+The purpose of the combiner is to handle the output (key, value) pairs from mapper function while the data is still in memory, when a certain amount of data has been written, it emits (key, values processed in this part) pairs to reducer. Instead of gathering data from disc (as reducer does), combiner acts like a buffer procedure which speed up the data processing time. While handling large amount of data, combiner plays in important role in reducing the amount of work before passing data to reducer function. It significantly increases the performance of the entire progress because the read/write speed in memory is a lot faster than that in disc. Therefore, we should use combiner in all mapreduces.
+
+
+
+
+
+6. What was the price per GB processed for each cluster size? (Recall that an extra-large instance costs $0.68 per hour, rounded up to the nearest hour.)
+6 clusters:   0.68 * 2 * 6 / (2788424629*15/10^9) = $0.195 / GB
+9 clusters:   0.68 * 1 * 9 / (2788423494*9/10^9)  =  $0.244 / GB
+12 clusters: 0.68 * 1* 12 / (2788423344*7/10^9)  = $0.418 / GB
+
+
+
+
+
+7. How many dollars in EC2 credits did you use to complete this project? If ec2-usage returns bogus values, please try to approximate (and indicate this).
+ec2-usage estimated total spending = $2244.680
+However, we can calculate the total spending by using 0.68 / (hour)(instance)
+
+For 6 clusters, we used 92 minutes and 18 seconds which round up to 2 hours.
+Spending on 6 clusters = $0.68 * 2 * 6 = $8.16
+
+For 9 clusters, we used 34 minutes and 40 seconds which round up to 1 hours.
+Spending on 6 clusters = $0.68 * 1 * 9 = $6.12
+
+For 12 clusters, we used 19 minutes and 15 seconds which round up to 1 hours.
+Spending on 6 clusters = $0.68 * 1 * 12 = $8.16
+
+Total spending in this project = $8.16 + $6.12 + $8.16 = $22.44
+
+
+
+
+
+
+8. Extra Credit: Compare the performance of your code to the reference. Compute the same results as problems 1, 3, and 4 above with the reference code. How much faster or slower is your implementation relative to the reference?
+
+
+9. Optional: What did you think of this project? This is the first time it has been offered, but hopefully not the last. What did you like, not like, or think we should change?
+Overall speaking, this was the hardest project I've ever seen in my life. Regardless the difficulty of understanding the syntax in Java, which I believe it happened on most of the folks who took 61A as their first CS class, the procedure of the entire project was unclear (we (me and my partner) spent >= 30 hours to understand where should we start). Though I admit that I learned a lot in these project, however, I will ask to lower down a bit the level 
+in the coming projects and give more clear instructions. Right, we are Berkeley students, but please do not assume every single one of us has >= 140 IQ score.
+ 

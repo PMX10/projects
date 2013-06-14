@@ -1,0 +1,41 @@
+a)
+Approach 1: 
+-First, we generate a private key, data0.priv, using "openssl genrsa -out data0.priv 2048"
+-Next, we generate a csr, data0.rep, using "openssl req -new -key data0.priv -out data0.rep"
+-Since Budget Certs "R" Us only signed certificate requests with neocal.info, for the common name of the csr, we entered "data.gov-of-caltopia.info/.neocal.info".
+-The client_fragment.c only checks for the delimiter, '/', so it will think that the csr is from data.gov-of-caltopia.info instead 
+-After that, we signed the cert by entering our logins, secret, and request at "https://www.budget-certs-r-us.biz"
+-Enter the sslsniff folder and run "./sslsniff_install_cert data0.x509 data0.priv"
+-Run "./sslsniff"
+-We found that the http_request has emergency_kill=false
+-Therefore we modified the rewriter.rb file to change emergency_kill to 'true' using the code "http_request["false"]="true"
+-We also noticed that the Content-Length is initially 181 and changing 'false' to 'true' decreases the total number of characters by 1. Therefore, we also have to change the Content-Length from 181 to 180 by adding the code "http_request["181"]="180"
+-After that, we can run "./sslsniff" and the emergency_kill will be executed
+-The sslsniff.log will show that <html>Kill command received. Emergency kill initiated! Disabling system...</html>
+-https://4thwall.neocal.info also shows that the 4th wall is broken
+
+Approach 2: 
+-First, we generate a new private key, using "openssl genrsa -out data1.priv 2048"
+-Next, we generate a csr, cert.csr, using "openssl req -new -key data1.priv -out cert.csr"
+-We then create a new c file, generate_input.c, to generate the input data, input.dat, for rewrite_cn such that it contains a null byte right after "data.gov-of-caltopia.info", while the CN still ends with ".neocal.info"
+-To compile the c file, we run "gcc -o generate_input generate_input.c"
+-Run "./generate_input" to generate input.dat for the input argument for rewrite_cn
+-Then, we run "./rewrite_cn cert.csr data1.priv input.dat data1.req" to change the CN of the certificate request to the input file we gave it, that contains the null byte 
+-The certificate request is stored within the data1.req file
+-We will then use the certificate request in data1.req to generate a new certificate, data1.x509
+-Because of the null byte, when it reads the CN, it only reads till "data.gov-of-caltopia.info" and signs it even though the CN ends with ".neocal.info"
+-With the new certificate request, we enter the sslsniff folder and run "./sslsniff_install_cert data1.x509 data1.priv"
+-Run ./sslsniff and the sslsniff.log will show that <html>Kill command received. Emergency kill initiated! Disabling system...</html>
+-https://4thwall.neocal.info also shows that the 4th wall is broken
+
+b)
+gov-of-caltopia.info is using the client_fragment.c to verify the certificate. Since there is some vulnerability in the code, it would be better to write an improved version of the code to prevent similar kind of exploit. With a new and safer code to verify the certificate, it would be able to defend against the attack. 
+
+c) 
+The Governor can be more prudent about the kinds of certificates to trust. If he knows that the Budget Certs R Us has some vulnerability, he can choose to not trust that certificate and remove it from his trusted CA list. 
+The Governor can also install the latest updates and ensure that his browser is up to date. If there is any update in the CA's blacklist and Budget Cert R Us is included, his browser will detect it and pops up a warning. This can keep the Governor updated about the latest list of untrusted CA and prevents him from trusting the wrong CA. 
+
+d) 
+Budget Cert R Us can be more cautious in checking the CN. Instead of just signing any domain that ends with .neocal.info, it should ensure that there is no special characters within the CN, such as the null byte. By ensuring that there is no null byte in the CN and having a more detailed check, it can prevent the attacker from using the exploit we used. 
+
+

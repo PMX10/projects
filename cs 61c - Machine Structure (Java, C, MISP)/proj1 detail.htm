@@ -1,0 +1,168 @@
+<!doctype html public "-//w3c//dtd html 4.01 transitional//en">
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<title>CS 61C Project 1</title>
+	<link rel="stylesheet" href="default.css" type="text/css" />
+</head>
+
+<body>
+<div class="document" id="cs61c-proj1">
+	<h1 class="title">CS 61C Project 1</h1>
+	<h2 class="subtitle">Small World Experiment with MapReduce</h2>
+	<h4 class="subtitle">Part 1 due Sunday, February 5th, 2012 @ 23:59:59</h3>	
+	<h4 class="subtitle">Part 2 due Sunday, February 12th, 2012 @ 23:59:59</h3>
+	<h4 class="subtitle">TA: Scott Beamer</h4>		
+	<div class="section" id="updates">
+		<h2><a name="updates">Updates</a></h2>
+		<ul>
+		  <li><em>2012-02-11</em> &mdash; Part 2 #3 - Changed median to mean (will still accept median answers)</li>
+		  <li><em>2012-02-06</em> &mdash; Posted path to reference solution (Part 2)</li>
+		  <li><em>2012-02-06</em> &mdash; Added grading section</li>
+		  <li><em>2012-02-03</em> &mdash; Revised Part 2 problems</li>
+      <li><em>2012-02-03</em> &mdash; Part 2 graphs now accessible</li>
+      <li><em>2012-02-03</em> &mdash; New tips added</li>
+		</ul>
+	</div>
+
+	<div class="section" id="summary">
+		<h2><a name="summary">Summary</a></h2>
+		<p>In this project you will use MapReduce to analyze data from real social networks. In Part 1, you will develop and test your code locally and for Part 2, you will run it on EC2. You will submit your code and answers via <code>git</code> to your class github repo. You may work with a partner.</p>
+	</div>
+
+	<div class="section" id="intro">
+		<h2><a name="intro">Introduction</a></h2>
+		<p>Have you ever heard of the infamous <em><a href="http://en.wikipedia.org/wiki/Six_degrees_of_separation">six degrees of separation</a></em> or played the game <em><a href="http://en.wikipedia.org/wiki/Six_Degrees_of_Kevin_Bacon">Six Degrees of Kevin Bacon</a></em>? They are both outcomes of the <em><a href="http://en.wikipedia.org/wiki/Small-world_phenomenon">small-world property</a></em> of social networks, which states that the average distance between any two vertices grows very slowly (logarithmically) relative to the size of the network. In practice, even for very large social networks, the median distance is small -- Twitter user follows (4), MSN Message Conversations (6), Facebook friendships (5), and Hollywood co-actors (4).</p>
+		<p>We will use the large processing capabilities of a Hadoop cluster to analyze data from real social networks to approximate the distance distribution to get a feel for how far apart most things are. To do this, we will randomly pick a subset of the vertices in the graph, and compute their distances to all other vertices. Your final program will take in a social graph and a constant for sampling and it will return a histogram of the approximated distance distribution.</p>
+	</div>
+
+	<div class="section" id="algo">
+		<h2><a name="algo">Algorithm</a></h2>
+		<p>Formally, we can think of each input social network as defining a graph. Each person is a vertex and each relationship is an edge. This graph is unweighted since all relationships (friendships, follows, collaborations) are equivalent. The distance between any two vertices is the number of edges in the shortest path between them. To find the all of the distances from one starting point, one would normally use a Single-source Shortest Path algorithm such as Dijkstra's Algorithm, but since the graph is unweighted, we can get away with a simple Breadth-First Search (BFS). Better yet, the BFS will be much easier to parallelize. To get a feel for how this works, examine the pseudocode for a serial BFS implementation below:</p>
+    <pre class="literal-block"><b>def bfs(vertices, s)</b>
+  for v in vertices
+    dist[v] = -1
+    dist[s] = 0
+  queue = [s]
+  for v in queue
+    for n in neighbors(v)
+      if dist[n] == -1
+        dist[n] = dist[v] + 1
+        queue += [n]
+  return dist</pre>
+    <p>This variant of breadth-first search will return the distance each vertex is from the starting point <code>s</code>. Notice that each vertex is visited only once, so its distance is updated if it is ever reached and previously unvisited. Your parallel version for MapReduce will be different, but above example was given to show BFS can compute distances on an unweighted graph.</p>
+    <p>We will only perform breadth-first searches from a subset of the nodes to save on time since not much more fidelity is gained by examining all of them. The program will: load in the social graph, perform multiple breadth-first searches, and compute the histogram. We recommend performing the searches simultaneously since it will result in less times the graph is copied and it will require less mapreduces, both of which will accelerate  processing. To pick the starting points, we search from each vertex with the probability of 1/<em>denom</em>, so in expectation, the program will perform <em>num_vertices</em>/<em>denom</em> searches. We leave the actual number of searches to chance since this method is better for a distributed setting like MapReduce. For each vertex, the choice of whether to search from it is completely parallel, and the only global information it needs is with what probability to select it. It does not require calculating (and distributing) how many vertices are in the graph or making sure each starting vertex exists.</p>
+    <p>The histogram is simply the totals of how many shortest paths are of each distance.</p>
+	</div>
+
+	<div class="section" id="details">
+		<h2><a name="details">Problem Details</a></h2>
+		<p>The input graphs are encoded in Hadoop's <code>SequenceFileType</code> and each element is <code>(key,value)</code> = <code>(LongWritable source, LongWritable destination)</code>. The output should be in Hadoop's <code>TextFormat</code>, with <code>(key,value)</code> = <code>(LongWritable distance, LongWritable total)</code>, where total is the number of shortest paths with that distance. The breadth-first searches should stop early if there are no more distances to be computed, but it also should not run more than the provided <code>MAX_ITERATIONS</code> = 20 to limit runtime in the presence of a few outliers.</p>
+    <p>The vertices in each graph are given by long identifiers. The address range is not necessarily contiguous (e.g. could have vertices {0,1,5,9}). Each input relation is intended to be treated as a directed edge. If the original relation is undirected, the other direction for that relation will be somewhere in the input. There can be repeat relations, but there will not be loops (self-edges).</p>
+    <p>The <em>denom</em> constant will be fed in on the command line. To propagate it to all Hadoop instances in the cluster, the skeleton code will actually write it to a file and use the HDFS caching feature to distribute it. The skeleton code takes care of this for you.</p>
+    <p>If a vertex is unreachable (or has a distance greater than <code>MAX_ITERATIONS</code>), it should not contribute to the histogram.</p>
+    <p>To help understand the intended operation, we provide an <a href="example.html">example</a>.
+	</div>
+
+	<div class="section" id="provided">
+		<h2><a name="provided">Provided Resources</a></h2>
+		<p>We provide you with <code>SmallWorld.java</code> and a <code>Makefile</code> in <code>~cs61c/proj1</code>. You can copy them to your home directory by:</p>
+		<pre class="literal-block">$ cp -r ~cs61c/proj1 ~</pre>
+		<p>There should not be need for you to create any additional files, but if you do, be sure that <code>make</code> compiles them all and that <code>main</code> is still present in the <code>SmallWorld</code> class in <code>sw.jar</code>. Feel free to modify <code>SmallWorld.java</code>, however you want while still completing the program requirements. The code in there is intended to take care of tedious coding details or provide examples of useful things you may want to modify or mimic in your solution.</p>
+    <p>The skeleton code assumes your code will use three types of mapreduces (graph loading, breadth-first search, and histogram making), and the code in <code>main</code> supports that. The skeleton code is intended to demonstrate how to chain and even iterate multiple mapreduce jobs. Currently all of the maps and reduces are identity, except <code>LoaderMap</code> which filters out some of the edges. It will need to be changed, but it is there to demonstrate accessing and using <code>denom</code>.</p>
+    <p>The <code>EValue</code> class is provided to give an example implementation of a class that implements Hadoop's <code>Writable</code> Interface. This allows it to be the value of a map or reduce phase. For it to be used as a key type for map or reduce, it would need to implement the <code>WritableComparable</code> interface. <code>EValue</code> currently packages an enumerated type and a long together, but feel free to modify it to suit your implementation.</p>
+    <p><em>Counters</em> are a useful feature of Hadoop that lets you count properties of your program as the data flows by. There are default counters that already count things such as how many map and reduce tasks are done each phase. The skeleton code provides an example of making and reading a new counter on lines 122 and 180. It reads in how many edges the graph input has and prints them out.</p>
+    <p>You should complete this project <em>on the machines in 330 Soda</em>. If you are not sitting physically in front of one of these lab machines, you can access one of <a href="https://inst.eecs.berkeley.edu/cgi-bin/clients.cgi?choice=330soda">them</a> remotely by following these <a href="https://inst.eecs.berkeley.edu/connecting.html#network">instructions</a>. The code should run both locally and remotely the same as in <a href="http://inst.eecs.berkeley.edu/~cs61c/sp12/labs/02/">lab2</a> and lab3. We recommend spending the majority of your development time working locally and with a small dataset to speed up and simplify debugging. The syntax for using the completed program is:<p>
+    <pre class="literal-block">$ hadoop jar sw.jar SmallWorld input_graph output_dir denom</pre>
+    <h4>Local Graphs (<code>~cs61c/p1data/</code>)</h4>
+      <ul>
+        <li><code>ring4.seq</code> - 4 vertices in a ring (0&rarr;1, 1&rarr;2, 2&rarr;3, 3&rarr;0)</li>
+        <li><code>cit-HepPh.sequ</code> - 35K vertices from High Energy Physics collaborations</li>
+      </ul>
+    <h4>EC2 Graphs (<code>s3n://cs61cSp12/</code>)</h4>
+      <ul>
+        <li><code>hollywood.sequ</code> - Hollywood co-star database circa 2009 (1M actors)</li>
+        <li><code>wikipedia.seq</code> - Wikipedia links circa 2011 (5.7M articles) - <em>For fun: not part of assignment</em></li>
+        <li><code>twitter</code> - Twitter user follow graph circa 2009 (60M profiles, 1.2B follows) - <em>Very large: if course has budget, will make available</em></li>
+      </ul>
+	</div>
+	
+
+	<div class="section" id="tips">
+		<h2><a name="tips">Tips</a></h2>
+    <ul>
+      <li><em>We strongly encourage</em> you to use <code>git</code> to manage your code for this project. You will need to submit your code using <code>git</code>, so you might as well take advantage of it while you are developing.</li>
+      <li>Both Java and Hadoop have many popular versions with different APIs. We are using: <a href="http://docs.oracle.com/javase/6/docs/api/">Java 6</a> and <a href="http://hadoop.apache.org/common/docs/r0.20.2/api/index.html">Hadoop 0.20.2</a></li>
+      <li>You may want to change the output (and input) formats to be more readable during development, to something like <code>TextOutput</code>. The <code>SequenceFileOutputFormat</code> is the fastest because it is a compressed binary encoding.</li>
+      <li>The number of distance 0 shortest paths is the number of searches done</li>
+      <li>Try to keep the number of searches for the huge graphs on the order of a few dozen or less</li>
+      <li>A <em>denom</em> value of 1 will search from every vertex</li>
+      <li>The correct output for <code>ring4.seq</code> with <em>denom</em>=1 is {(0,4),(1,4),(2,4),(3,4)}</li>
+      <li><em>New:</em> For running <code>cit-HepPh.sequ</code> on <code>hive</code>, you should be able to complete within your disk quota with <em>denom</em>=10000.</li>
+      <li><em>New:</em> <code>ring4.seq</code> and <code>cit-HepPh.sequ</code> are also available in <code>s3n://cs61cSp12/</code> to test.</li>
+      <li><em>New:</em> To delete all of the intermediate outputs and final output (assuming they all end in -out) for your cluster:<pre class="literal-block">hc large dfs -rmr hdfs:///*-out hdfs:///user/cs61c-XX/*-out</pre></li>
+      <li><em>New:</em> Set the number of reducers to take full advantage of the cluster you are using (see how many on the job tracker page). To set the value for a particular <code>job</code>, you can set it in your source file with:<pre class="literal-block">job.setNumReduceTasks(1);</pre>
+To set the value globally for all reducers from the command line, use:<pre class="literal-block">hc large jar sw.jar SmallWorld -Dmapred.reduce.tasks=20 ...</pre>
+If you use the command line option, override it to be 1 for your <code>histogram</code> reduce (with the source snippet above) because we want only 1 output file.</li>
+    </ul>
+	</div>
+
+
+	<div class="section" id="parts">
+		<h2><a name="parts">Assignment</a></h2>
+    <h3>Part 1 (due 2/5/12 @ 23:59:59)</h3>
+    <p>Complete the problem locally and submit <code>SmallWorld.java</code>. Submit the <code>Makefile</code> (if modified) or any additional source files if needed.</p>
+    <h3>Part 2 (due 2/12/12 @ 23:59:59)</h3>
+    <p>Before running your code on EC2, run it locally to be sure it is correct and decently efficient. We are providing a solution to use for Part 2 for those whose Part 1 code isn't fast enough at <code>~cs61c/proj1/sw_ref.jar</code>. If you code is efficient, please use it.
+Submit <code>SmallWorld.java</code>, <code>Makefile</code> (if modified), and any additional source files it needs. Additionally, complete the following questions and submit them in <code>proj1.txt</code>.</p>
+    <ol>
+      <li>Run your code on <code>hollywood.sequ</code> with <em>denom</em>=100000 on clusters of size 6, 9, and 12. How long does each take? How many searches did each perform? How many reducers did you use for each? (Read the rest of the questions to see what other data you will need)</li>
+      <li>For the Hollywood dataset, at what distance are the 50th, 90th, and 95 percentiles?</li>
+      <li>What was the mean processing rate (MB/s) for 6, 9, and 12 instances? You can approximate the data size to be <em>(input size) * (# of searches)</em>.</li>
+      <li>What was the speedup for 9 and 12 instances relative to 6 instances? What do you conclude about how well Hadoop parallelizes your work? Is this a case of strong scaling or weak scaling? Why or why not?</li>
+      <li>What is the purpose of including the combiner in the histogram skeleton code? Does its inclusion affect performance much? Why or why not? Could you have used a combiner in your other mapreduces? Why or why not?</li>
+      <li>What was the price per GB processed for each cluster size? (Recall that an extra-large instance costs $0.68 per hour, rounded up to the nearest hour.)</li>
+      <li>How many dollars in EC2 credits did you use to complete this project? If <code>ec2-usage</code> returns bogus values, please try to approximate (and indicate this).</li>
+      <li><em>Extra Credit:</em> Compare the performance of your code to the reference. Compute the same results as problems 1, 3, and 4 above with the reference code. How much faster or slower is your implementation relative to the reference?</li>
+      <li><em>Optional:</em> What did you think of this project? This is the first time it has been offered, but hopefully not the last. What did you like, not like, or think we should change?</li>
+    </ol>
+	</div>
+
+	
+	<div class="section" id="submit">
+		<h2><a name="submit">Submission</a></h2>
+		<p>You will submit this project via <code>git</code>. You should have set up access to your own CS 61C repo in <a href="http://inst.eecs.berkeley.edu/~cs61c/sp12/labs/01/">lab1</a>. Place your code in a subdirectory called <code>proj1</code> inside of your class repo. Tag the commit for your Part 1 submission <code>proj1-1</code> and tag the commit for your Part 2 submission <code>proj1-2</code>. To be fully submitted, those commits need to be pushed to github by their respective deadlines. The code below assumes the most recent commit is the one you want to submit for part 1.</p>
+		<pre class="literal-block">$ cd (your local repo)
+$ git tag proj1-1
+$ git push origin (branch of your commit)
+$ git push --tags</pre>
+    <p>Be sure to put your name and login (and your partner's name and login if you have one) at the top of your submitted source files, especially <code>SmallWorld.java</code></p>
+	</div>
+
+
+	<div class="section" id="grading">
+		<h2><a name="grading">Grading</a></h2>
+		<h3>Part 1 (20 points)</h3>
+		<h3>Part 2 (10 points)</h3>
+		  Extra Credit for using your code (bonuses are not cumulative)
+		  <ul>
+		    <li><em>+3</em> points extra if your code is within 2x performance of reference</li>
+		    <li><em>+5</em> points extra if your code is within 20% performance of reference</li>
+		    <li><em>+6</em> points extra if your code has greater than 20% better performance of reference</li>
+		  </ul>
+	</div>
+
+
+	<div class="section" id="links">
+		<h2><a name="links">Additional Links on Social Network Analysis</a></h2>
+    <ol>
+      <li>Haewoon Kwak, Changhyun Lee, Hosung Park, and Sue Moon. <a href="http://an.kaist.ac.kr/traces/WWW2010.html">What is Twitter, a Social Network or a News Media?</a>. <em>WWW 2010</em>. (analysis of Twitter and source of our Twitter data)</li>
+      <li>Duncan J. Watts and Steven H. Strogatz. <a href="research.yahoo.com/files/w_s_NATURE_0.pdf">Collective dynamics of ‘small-world’ networks</a>. <em>Nature</em>:393, 1998. (mathematics behind small-world networks)</li>
+      <li><a href="http://snap.stanford.edu/data/index.html">Stanford Network Analysis Project</a> (a great source of social network data and the source of cit-HepPh)</li>
+      <li><a href="http://law.dsi.unimi.it/datasets.php">Laboratory for Web Algorithmics</a> (source of the Hollywood data and has current metrics on largest social networks)</li>
+      <li><a href="http://haselgrove.id.au/wikipedia.htm">Wikipedia Crawl</a></li>
+    </ol>
+	</div>
+</div>
+</body>
+</html>

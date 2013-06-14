@@ -1,0 +1,177 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head><title>CS 162 Project 3</title></head><body bgcolor="#ffffff">
+
+<h1 align="center">Project 3: Build a Single Server Key-Value Store</h1>
+
+<p>In Project 3, you will implement a key-value store that runs on a single node. <!--As in projects 1 and 2, you will submit an initial design document and a final design document apart from the code itself.--></p>
+
+<img src="pics/proj3-arch.png" alt="Architecture Diagram">
+<p><b>Figure:</b> A single-node key-value store with three clients simultaneously trying to access it. </p>
+
+<h3>Summary</h3>
+<p>Multiple clients will be communicating with a single key-value server (<tt>KVServer</tt>) in a given messaging format (<tt>KVMessage</tt>) using a client library (<tt>KVClient</tt>). Communication between the 
+clients and the server will take place over the network through sockets (<tt>SocketServer</tt> and <tt>KVClientHandler</tt>). The server uses a threadpool (<tt>ThreadPool</tt>) to support concurrent operations across 
+multiple sets in a write-through set-associative cache (<tt>KVCache</tt>), which is backed by a store (<tt>KVStore</tt>). </p>
+
+<h3>Skeleton Code</h3>
+<p>The project skeleton you <strong>must</strong> build on top of is posted at <a href="https://bitbucket.org/bruckner/project3skeleton">https://bitbucket.org/bruckner/project3skeleton</a>. You can define 
+additional classes and methods as you deem fit.  Be aware that you may need to implement methods that are not labeled with &quot;<b>//implement me</b>&quot;  comments---these comments are meant as hints only and are not comprehensive.</p> 
+<p>If you have git installed on your system, you can run <tt>git clone https://bitbucket.org/bruckner/project3skeleton.git</tt>. In case you want to fork the project on <a href="http://bitbucket.org">BitBucket</a>, 
+make sure to make it <strong>private</strong>
+so that no one else can see your code. BitBucket has an academic
+licenses that give you many pro features including private repositories
+with unlimited collaborators for free. Visit <a href="http://www.atlassian.com/software/views/bitbucket-academic-license.jsp">this link</a> for more details. Additionally, for a quick tutorial on git, visit <a href="http://cs61.seas.harvard.edu/wiki/2012/Git">Eddie Kohler's tutorial on git</a>.</p>
+
+<p>Finally, you can just download it from <a href="https://bitbucket.org/bruckner/project3skeleton/get/a2ef595960b1.zip">here</a> without ever having to learn or use git. You can continue to use the same SVN repositories that was used for projects 1 and 2.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Your key-value server will support 3 interfaces:
+    <ul>
+      <li><strong>Value GET (Key k)</strong>: Retrieves the key-value pair corresponding to the provided key.</li>
+      <li><strong>PUT(Key k, Value v)</strong>: Inserts the key-value pair into the store.</li>
+      <li><strong>DEL(Key k)</strong>: Removes the key-value pair corresponding to the provided key from the store.</li>
+    </ul>
+    You will use the <strong>exact</strong> request/response formats defined later in the specification for communication between external and internal components. 
+  </li>
+  <li>'Keys' and 'values' are always strings with non-zero lengths. They cannot be nulls either.</li>
+  <li>Each key can be of size no greater than 256 <strong>bytes</strong> and each value can be of size no greater than 256 <strong>kilobytes</strong>. If the size is breached, return an error. (Assume each character to be 1 byte in size)</li>
+  <li>When inserting a key-value pair, if the key already exists, then the value is overwritten.<!--If the value is overwritten, then the "Status" field should have "True"; otherwise, it should be "False".--></li>
+  <li>When retrieving a value, if the key does not exist, return an error message.</li>
+  <li>Make sure that the server can handle concurrent requests across sets.</li>
+  <li>For all networking parts of this project, you should use only the <tt>java.net.Socket</tt> and <tt>java.net.ServerSocket</tt> classes. You should not use any wrappers around the Socket class. If in doubt, post on 
+Piazza if it is acceptable.</li>
+  <li>For
+this project, you cannot use any thread-safe data structures that has
+been defined by the JVM. For example, you will have to use Conditional
+Variables and Locks with a <tt>java.util.LinkedList</tt> rather 
+than depend upon Java's synchronized implementations (such as <tt>java.util.concurrent.BlockingQueue</tt>). We want you to learn how to build thread-safe data structures by using the basic synchronization building 
+blocks (Locks, ReadWriteLocks, Conditional Variables, etc) that you learnt in Projects 1 and 2. This means that you can use the <tt>synchronized</tt> keyword, locks (including readwrite locks), java Object's internal 
+locking and condition mechanisms, non thread-safe data structures like <tt>HashMap</tt> and <tt>LinkedList</tt>.</li>
+  <li>You should ensure the following synchronization properties in your key-value service:
+    <ol>
+      <li>Reads (GETs) and updates (PUTs and DELETEs) are atomic.</li>
+      <li>An update consists of modifying a (key, value) entry in both the KVCache and KVStore.</li>
+      <li>All
+operations (GETs, PUTs, and DELETEs) must be parallel across different
+sets in the KVCache, and they cannot be performed in parallel within
+the same set.</li>
+    </ol></li>
+    <li>Each set in the cache will have a fixed number of entries, and evict entries (when required) using the SecondChance algorithm. In implementing SecondChance, a key X is marked as &quot;accessed&quot; <b>only when</b> X is in the cache and GET(X) is invoked on the cache.</li>
+  <li>For all operations, you must use the <tt>KVCache.getSetId(key)</tt> to determine which unique set in the cache each key belongs to.</li>
+  <li>You
+should bulletproof your code, such that the key-value server does not
+crash under any circumstances. For this Project you can ignore <tt>SecurityException</tt>s and <tt>InterruptedException</tt>s.</li>
+  <li>You will run the key-value service on port 8080.</li>
+</ul>
+
+<h3>Tasks (Weights)</h3>
+<ol>
+  <li><em>(20%)</em> Implement the message parsing library in <tt>KVMessage</tt>.</li>
+  <li><em>(10%)</em> Implement the <tt>KVClient</tt> class that you are provided with, such that it will issue requests and handle responses (generated using <tt>KVMessage</tt>) using sockets.</li>
+  <li><em>(15%)</em> Implement a <tt>ThreadPool</tt>
+-- you are not allowed to use existing implementation of threadpools.
+The threadpool should accept different tasks and execute them
+asynchronously. The threadpool should maintain a queue of tasks
+submitted to it, and should assign it to a free thread as soon as it is
+available. Ensure that the <tt>addToQueue</tt> interface to the threadpool is <strong>non-blocking</strong>.</li>
+  <li><em>(15%)</em> Implement <tt>dumpToFile</tt> and <tt>restoreFromFile</tt> in <tt>KVStore</tt>. Also, implement <tt>toXML</tt> in <tt>KVCache</tt>.</li>
+  <li><em>(15%)</em> Implement a write-through set-associative <tt>KVCache</tt>
+with the SecondChance eviction policy within each set. The cache should
+be instantiated with parameter(s) passed to the constructor.</li>
+<li><em>(25%)</em> Implement <tt>KVServer</tt>, <tt>SocketServer</tt>, and <tt>KVClientHandler</tt> that use the threadpool to parallelize data storage into the dummy storage system provided to you (<tt>KVStore</tt>). Use the set-associative cache you implemented to 
+make key lookups faster. You should follow a <strong>write-through</strong> caching policy.</li>
+</ol>
+
+<h3>Deliverables</h3>
+<p>As in projects 1 and 2, you will have to submit initial and final design documents as well as the code itself. </p>
+<ol>
+  <li>Initial Design Document (<strong>Due: 4/8</strong>)</li>
+  <li>Code (<strong>Due: 4/18</strong>)</li>
+  <li>Final Design Document (<strong>Due: 4/19</strong>)</li>
+</ol>
+<p><strong>Additionally</strong>, you will have to submit JUnit test cases for each of the classes you will implement (<tt>KVMessage</tt>, <tt>KVClient</tt>, <tt>ThreadPool</tt>, <tt>KVStore</tt>, <tt>KVCache</tt>, and 
+<tt>KVServer</tt>). Following is an outline of the expected progress in terms of test cases in each of the project checkpoints.</p>
+<ul>
+  <li>Initial Design Document: <em>One sentence</em> on each test case <em>you plan on implementing</em> for each class and why.</li>
+  <li>Code: Submit the final set of test cases.</li>
+  <li>Final Design Document: <em>One sentence</em> on each test case <em>you have implemented</em> for each class and why.</li>
+</ul>
+
+<h3>KVMessage Format</h3>
+<ul>
+  <li><strong>Get Value Request:</strong><br>
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;<br>&lt;KVMessage type="getreq"&gt;<br>&lt;Key&gt;key&lt;/Key&gt;<br>&lt;/KVMessage&gt;<br></li>
+  <li><strong>Put Value Request:</strong><br>
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;<br>&lt;KVMessage type="putreq"&gt;<br>&lt;Key&gt;key&lt;/Key&gt;<br>&lt;Value&gt;value&lt;/Value&gt;<br>&lt;/KVMessage&gt;<br></li>
+  <li><strong>Delete Value Request:</strong><br>
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;<br>&lt;KVMessage type="delreq"&gt;<br>&lt;Key&gt;key&lt;/Key&gt;<br>&lt;/KVMessage&gt;<br></li>
+  <li><strong>Successful Get Response:</strong><br>
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;<br>&lt;KVMessage type="resp"&gt;<br>&lt;Key&gt;key&lt;/Key&gt;<br>&lt;Value&gt;value&lt;/Value&gt;<br>&lt;/KVMessage&gt;</li>
+  <li><strong>Successful Put Response:</strong><br>&lt;?xml version="1.0" encoding="UTF-8"?&gt;<br>&lt;KVMessage type="resp"&gt;<br><!--&lt;Status&gt;True/False&lt;/Status&gt;<br 
+/>-->&lt;Message&gt;Success&lt;/Message&gt;<br>&lt;/KVMessage&gt;</li>
+  <li><strong>Successful Delete Response:</strong><br>&lt;?xml version="1.0" encoding="UTF-8"?&gt;<br>&lt;KVMessage type="resp"&gt;<br>&lt;Message&gt;Success&lt;/Message&gt;<br>&lt;/KVMessage&gt;</li>
+  <li><strong>Unsuccessful Get/Put/Delete Response:</strong><br>&lt;?xml version="1.0" encoding="UTF-8"?&gt;<br>&lt;KVMessage type="resp"&gt;<br>&lt;Message&gt;Error 
+Message&lt;/Message&gt;<br>&lt;/KVMessage&gt;</li>
+</ul>
+
+<h3>(Case-Sensitive) Error Messages</h3>
+<ul>
+  <li>"Success" -- There were no errors</li>
+  <li>"Network Error: Could not send data" -- If there is an error sending data</li>
+  <li>"Network Error: Could not receive data" -- If there is an error receiving data</li>
+  <li>"Network Error: Could not connect" -- Could not connect to the server, port tuple</li>
+  <li>"Network Error: Could not create socket" -- Error creating a socket</li>
+  <li>"XML Error: Received unparseable message" -- Received a malformed message</li>
+  <li>"Oversized key" -- In the case that the submitted key is over 256 bytes (does not apply for get or del requests)</li>
+  <li>"Oversized value" -- In the case that the submitted value is over 256 kilobytes</li>
+  <li>"IO Error" -- If there was an error raised by <tt>KVStore</tt></li>
+  <li>"Does not exist" -- For GET/DELETE requests if the corresponding key does not already exist in the store</li>
+  <li>"Unknown Error: error-description" -- For any other error. Fill out "error-description" with your own description text.</li>
+  <!--<li>"Empty key" -- If PUT tried to insert an empty key</li>
+  <li>"Empty value" -- If PUT tried to insert an empty value</li>-->
+</ul>
+
+<p>For network errors arising on the server when it is not possible to
+return the error to the client, you can drop this silently. For errors
+generated on the client (KVClient), you can drop this silently as well.</p>
+
+<h3><tt>KVCache.toXML()</tt> Return Format</h3>
+<p>
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;<br>
+&lt;KVCache&gt;<br>
+  &nbsp; &lt;Set Id="<em>id</em>"&gt;<br>
+    &nbsp; &nbsp; &lt;CacheEntry isReferenced="<em>true/false</em>" isValid="<em>true/false</em>"&gt;<br>
+      &nbsp; &nbsp; &nbsp; &lt;Key&gt;<em>key</em>&lt;/Key&gt;<br>
+      &nbsp; &nbsp; &nbsp; &lt;Value&gt;<em>value</em>&lt;/Value&gt;<br>
+    &nbsp; &nbsp; &lt;/CacheEntry&gt;<br>
+  &nbsp; &lt;/Set&gt;<br>
+&lt;/KVCache&gt;
+</p>
+
+<p>There should be as many <tt>Set</tt> elements as there are sets, and within each set, there should be as many <tt>CacheEntry</tt> elements as there are entries in each set. As mentioned earlier, the number of sets 
+and the number of elements in each sets will be given in the constructor. Sets must have <tt>Integer</tt> ids starting from zero.</p>
+
+<h3><tt>KVStore.dumpToFile(filename)</tt> Output Format</h3>
+<p>
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;<br>
+&lt;KVStore&gt;<br>
+    &nbsp; &nbsp; &lt;KVPair&gt;<br>
+      &nbsp; &nbsp; &nbsp; &lt;Key&gt;<em>key</em>&lt;/Key&gt;<br>
+      &nbsp; &nbsp; &nbsp; &lt;Value&gt;<em>value</em>&lt;/Value&gt;<br>
+    &nbsp; &nbsp; &lt;/KVPair&gt;<br>
+    &nbsp; &nbsp; &lt;KVPair&gt;<br>
+      &nbsp; &nbsp; &nbsp; &lt;Key&gt;<em>key2</em>&lt;/Key&gt;<br>
+      &nbsp; &nbsp; &nbsp; &lt;Value&gt;<em>value2</em>&lt;/Value&gt;<br>
+    &nbsp; &nbsp; &lt;/KVPair&gt;<br>
+&lt;/KVStore&gt;
+</p>
+
+<h3>On End-to-End Testing</h3>
+<p>While this project does not have an online autograder, there are
+appropriate hooks to the autograder in the skeleton and a bareboned <tt>AutoGrader</tt> class has been provided to make it easier for you to write 
+your own test cases.</p>
+<p><strong>DO NOT</strong> remove <tt>AutoGrader</tt> hooks from the skeleton.</p>
+
+
+</body></html>

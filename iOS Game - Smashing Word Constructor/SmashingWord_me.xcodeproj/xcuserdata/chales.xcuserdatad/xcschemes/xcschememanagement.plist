@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>SchemeUserState</key>
+	<dict>
+		<key>SmashingWord_me.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>0</integer>
+		</dict>
+		<key>Tests.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>1</integer>
+		</dict>
+		<key>Tests_Highscore.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>3</integer>
+		</dict>
+		<key>Tests_Multiplayer.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>2</integer>
+		</dict>
+	</dict>
+	<key>SuppressBuildableAutocreation</key>
+	<dict>
+		<key>2B82DAAE16F92A7400DE8649</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>A240D91C1733493B00CB1E1A</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>A24322D31732278100075E8C</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>A29D171F1720E19E00328D51</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+	</dict>
+</dict>
+</plist>

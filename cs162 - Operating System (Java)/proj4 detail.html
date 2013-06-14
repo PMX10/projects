@@ -1,0 +1,347 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head><title>CS 162 Project 4</title>
+
+
+
+<meta name="Author" content="Mosharaf Chowdhury (http://www.mosharaf.com)"></head><body bgcolor="#ffffff">
+
+<h1 align="center">Project 4: Build a Distributed Key-Value Store</h1>
+
+<h3>Summary</h3>
+<p>In Project 4, you will implement a distributed key-value store that
+runs across multiple nodes.
+</p><ul>
+  <li>Data storage is durable, i.e., the system does not lose data if
+  a single node fails. You will use replication for fault tolerance.</li>
+  
+  <li>The key-value store is to be built optimizing for read
+  throughput. Accessing data concurrently from multiple replicas of
+  the data will be used to improve performance.</li>
+  
+  <li>Operations on the store should be atomic. i.e., either the
+    operation should succeed completely or fail altogether without any
+    side effects. You will use the <a href="http://en.wikipedia.org/wiki/Two-phase_commit_protocol">Two-Phase Commit</a> (2PC) protocol to ensure
+    atomic operations.</li>
+  </ul>
+<p></p>
+
+<p>Multiple clients will be communicating with a single coordinating server
+in a given messaging format (<tt>KVMessage</tt>) using a client
+library (<tt>KVClient</tt>). The coordinator contains a write-through
+set-associative cache (<tt>KVCache</tt>), and it uses the cache to
+serve GET requests without going to the (slave) key-value servers it
+coordinates. The slave key-value servers are contacted for a GET only
+upon a cache miss on the coordinator. The coordinator will use
+the <tt>TPCMaster</tt> library to forward client requests for PUT and
+DEL to multiple key-value servers (<tt>KVServer</tt>)
+using <tt>TPCMessage</tt> and follow the <a href="#2pc">2PC protocol for atomic PUT
+and DEL operations</a> across multiple key-value servers. Note
+that, <tt>TPCMessage</tt> uses the same <tt>KVMessage</tt> class used
+in Project 3 with extra fields and message types. <tt>KVServer</tt>s
+remain the same as Project 3.</p>
+
+
+
+
+<img src="pics/proj4-overview.png" alt="Architecture Diagram">
+<p><b>Figure:</b> A distributed key-value store with replication factor of two. </p>
+
+<img src="pics/proj4-arch3.png" alt="Architecture Diagram">
+<p><b>Figure:</b> Functional diagram of a distributed key-value store.
+Components in colors other than black are the key ones you will be
+developing for this project. Blue depicts GET execution path, while
+green depicts PUT and DEL; purple ones are shard between operations.
+Note that, components in black might also require minor modifications
+to suite your purposes. Not shown in the figure: PUT and DEL will
+involve updating the write-through cache in the coordinator.</p>
+
+
+<h3>Skeleton Code</h3>
+<p>The project skeleton you <strong>should</strong> build on top of is
+posted
+at <a href="https://bitbucket.org/bruckner/project4skeleton">https://bitbucket.org/bruckner/project4skeleton</a>. If
+you have git installed on your system, you can run <tt>git clone https://bitbucket.org/bruckner/project4skeleton.git</tt>. Project 4
+builds on top of the Single Server key-value Store developed in
+Project 3; however, several interfaces have been extended to support
+the required functionalities for Project 4. You can reuse the code
+developed for Project 3 and define additional classes and methods as
+you see fit.</p>
+
+<p>You can also download the skeleton without using git from the above-mentioned <a href="https://bitbucket.org/bruckner/project4skeleton">URL</a> (look for the download link in that page).</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li><b>Unless otherwise specified below, you will have to satisfy the requirements described in <a href="phase3.html">Project 3</a>.</b></li>
+  <li>Each key will be stored using 2PC in <strong>two</strong>
+  key-value servers; the first of them will be selected
+  using <a href="#hashing">consistent hashing</a>, while the second
+  will be placed in the successor of the first one. There will
+  be <b>at least two</b> key-value servers in the system. See below
+  for further details.</li>
+  <li>Key-value servers will have 64-bit globally unique IDs (use
+  unique <tt>long</tt> numbers), and they will register with the
+  coordinator with that ID when they start. For simplicity, you can
+  assume that the total number of key-value servers are fixed, at any
+  moment there will be <strong>at most one</strong> down server, and
+  they always come back with the same ID if they crash (Note that this
+  simplification will cause the system to block on any failed
+  key-value server. However, not assuming this will require dynamic
+  successor adjustment and re-replication, among other
+  changes.). </li>
+  <li>You do not have to support concurrent update operations
+  irrespective of which key they are working on (i.e., 2PC PUT and DEL
+  operations are performed one after another), but retrieval
+  operations (i.e., GET) of different keys must be concurrent unless
+  restricted by an ongoing update operation on the same set.</li>
+  <!-- <li>Coordinator communication to individual replicas must be
+  performed in parallel, i.e., requests for vote and dissemination of
+  global decisions must be performed using multiple threads. </li>-->
+  <li>For this particular project, you can assume that the coordinator
+  will never fail/crash. Consequently, there is no need to log its
+  states, nor does it require to survive failures. Individual
+  key-value servers, however, must log necessary information to
+  survive from failures.<br>
+ </li>
+  <li>The coordinator server will include a <em>write-through</em>
+  set-associative cache, which will have the same semantics as the
+  write-through cache you used before. Caches at key-value servers
+  will still remain write-through.</li>
+  <li>You should bulletproof your code, such that the server does not
+  crash under any circumstance.</li>
+  <li>You will run the client interface of the coordinator server on
+  port 8080.</li>
+  
+  <li>When an individual key-value server (SlaveServer) starts it should
+start listening in a random port, and register that port with the
+master/coordinator (TPCMaster) so that the TPCMaster can send
+Put/Get/Del requests to it.The random port is assigned upon creation of a&nbsp; SocketServer for listening to 2PC requests. Note that when you see the  <tt>SocketServer</tt>'s constructor, the
+  port is set to -1, which must be replaced with a random port
+  number. They must register themselves with the 2PC interface of the
+  coordinator server running on port 9090. To make things simpler,
+  assume that the TPC master will always respond with a ack message
+  during registration </li>
+  <li>Your code should be able to handle the
+slave server dying at any point in the 2PC operation (there are
+multiple cases that you have to handle here), handle the <span style="font-family: monospace;">ignoreNext</span>
+messages, and handle pathological inputs to the system.</li>
+
+</ul>
+
+<h3>Tasks (Weights)</h3>
+<ol>
+  <li><em>(40%)</em> Implement the <tt>TPCMaster</tt> class that
+  implements 2PC coordination logic in the coordinator
+  server. <tt>TPCMaster</tt> must select replica locations
+  using <a href="#hashing">consistent hashing</a>.
+Only a single 2PC operation will be active at a time. You only have to
+handle parallel 2PC operations for extra credit (see #6 below).<br>
+</li>
+  <li><em>(40%)</em> Implement the <tt>TPCMasterHandler</tt> class
+  that implements logic for 2PC participants in key-value
+  servers. </li>
+  <li><em>(10%)</em> Implement registration logic in SlaveServer (aka
+  key-value Server) and RegistrationHandler
+  in <tt>TPCMaster</tt>. Each SlaveServer has a unique ID that it uses
+  to register with the <tt>TPCMaster</tt> in the coordinator. </li>
+  <li><em>(10%)</em> Implement the <tt>TPCLog</tt> class that
+  key-value servers will use to log their states during 2PC operations
+  and for rebuilding during recovery.</li>
+  <li><em><strong>Extra Credit (5%)</strong></em> Upon receiving a
+  request at the coordinator server, the server would need to contact
+  the slave servers the key is replicated to (only upon cache miss in
+  the case of GET requests). For the previous tasks, it is fine to
+  contact the slave-server sequentially. For extra credit, you should
+  improve the performance of the system by contacting the slave server
+  in parallel.</li>
+  <li><em><strong>Extra Credit (5%)</strong></em> In order to improve
+  the performance even further, the 2PC operations themselves should
+  be done in parallel. If the key in the requests hash to different
+  sets in the coordinator cache, then these requests should be
+  executed in parallel. Otherwise, the operations should be blocked
+  and executed one after the other.</li>
+</ol>
+
+<h3>Deliverables</h3>
+<p>As in previous projects, you will have to submit initial and final
+design documents as well as the code itself. </p>
+<ol>
+  <li>Initial Design Document (<strong>Due: April 29th, 2013</strong>)</li>
+  <li>Code (<strong>Due: May 9th, 2013</strong>)</li>
+  <li>Final Design Document (<strong>Due: May 10th, 2013</strong>)</li>
+</ol>
+<p><strong>Additionally</strong>, you will have to submit JUnit test
+cases for each of the classes you will implement. Following is an
+outline of the expected progress in terms of test cases in each of the
+project checkpoints.</p>
+<ul>
+  <li>Initial Design Document: <em>One sentence</em> on the test
+  cases <em>you plan on implementing</em> for each class and why.</li>
+  <li>Code: Submit the final set of test cases.</li>
+  <li>Final Design Document: <em>One sentence</em> on the test
+  cases <em>you have implemented</em> for each class and why.</li>
+</ul>
+
+<a id="hashing"><h3>Consistent Hashing</h3></a> As mentioned earlier,
+key-value servers will have unique 64-bit IDs. The coordinator will
+hash the keys to 64-bit address space. Then each key-value server will
+store the first copies of keys with hash values greater than the ID of
+its immediate predecessor up to its own ID. Note that, each key-value
+server will also store the keys whose first copies are stored in its
+predecessor. <p></p>
+
+<img src="pics/consistent-hashing.png" alt="Consistent Hashing">
+
+<p><b>Figure:</b> Consistent Hashing. Four key-value servers and three
+hashed keys along with where they are placed in the 64-bit address
+space. In this figure for example, the different servers split the key
+space into S1:; [2<sup>16</sup> + 1, 2<sup>23</sup>], S2:
+[2<sup>23</sup> + 1, 2<sup>35</sup>], S3: [2<sup>35</sup> + 1,
+2<sup>55</sup>] and finally note that the last server owns the key
+space S4: [2<sup>55</sup> + 1, 2<sup>64</sup> - 1] and [0,
+2<sup>16</sup>]. Now when a key is hash to say a value 2<sup>55</sup>
++ 1, it will be stored in the server that owns the key space, i.e, S4
+as well as the immediately next server in the ring S1.
+</p>
+
+<a id="2pc"><h3>Sequence of Operations During Concurrent GET and
+PUT/DEL Requests </h3></a>
+
+<img src="pics/seq-diag-phase4.png" alt="Sequence Diagram of
+Concurrent R/W Operations in Project 4">
+<p><b>Figure:</b> Sequence diagram of concurrent read/write operations
+using the 2PC protocol in Project 4. "Project 3" blocks in the diagram
+refer to the activities when clients write to a single-node key-value
+server, where the coordinator is the client to individual key-value
+servers. GET request from Client 1 is hitting the cache in the above
+diagram; if it had not, the GET request would have been forwarded to
+each of the SlaveServers until it is found. The
+Coordinator (TPCMaster) expects each individual key-value server to
+respond back with an ACK at the end of the 2nd phase; if it doesn't
+receive an ACK from a slave server, it will keep retrying. To handle
+failures during the 2nd phase (i.e., to send back the ACK properly),
+slave servers must log the received global decision <em>before</em> they have
+sent back the ACK. Note that the slaves don't send back a missing ACK
+before receiving the global decision from the master again.<br>
+</p><!--<img src="pics/seq-diag-phase3.png" alt="Sequence Diagram of Concurrent R/W Operations in Project 3"/>
+<p><b>Figure:</b> Sequence diagram of concurrent Read/Write operations in Project 3.</p>-->
+
+<h3>Extended KVMessage format (TPCMessage piggybacked on KVMessage) for the Coordinator and SlaveServer communication</h3>
+<ul>
+  <li><strong>2PC Put Value Request:</strong><br>
+    &lt;?xml version="1.0" encoding="UTF-8"?&gt;<br>
+    &lt;KVMessage type="putreq"&gt;<br>
+    &lt;Key&gt;key&lt;/Key&gt;<br>
+    &lt;Value&gt;value&lt;/Value&gt;<br>
+    &lt;TPCOpId&gt;2PC Operation ID&lt;/TPCOpId&gt;<br>
+    &lt;/KVMessage&gt;<br>
+  </li>
+  <li><strong>2PC Delete Value Request:</strong><br>
+    &lt;?xml version="1.0" encoding="UTF-8"?&gt;<br>
+    &lt;KVMessage type="delreq"&gt;<br>
+    &lt;Key&gt;key&lt;/Key&gt;<br>
+    &lt;TPCOpId&gt;2PC Operation ID&lt;/TPCOpId&gt;<br>
+    &lt;/KVMessage&gt;<br>
+  </li>
+  <li><strong>2PC Ready:</strong><br>
+    &lt;?xml version="1.0" encoding="UTF-8"?&gt;<br>
+    &lt;KVMessage type="ready"&gt;<br>
+    &lt;TPCOpId&gt;2PC Operation ID&lt;/TPCOpId&gt;<br>
+    &lt;/KVMessage&gt;
+  </li>
+  <li><strong>2PC Abort:</strong><br>
+    &lt;?xml version="1.0" encoding="UTF-8"?&gt;<br>
+    &lt;KVMessage type="abort"&gt;<br>
+    &lt;Message&gt;Error Message&lt;/Message&gt;<br>
+    &lt;TPCOpId&gt;2PC Operation ID&lt;/TPCOpId&gt;<br>
+    &lt;/KVMessage&gt;
+  </li>
+  <li><strong>2PC Decisions:</strong><br>
+    &lt;?xml version="1.0" encoding="UTF-8"?&gt;<br>
+    &lt;KVMessage type="commit/abort"&gt;<br>
+    &lt;TPCOpId&gt;2PC Operation ID&lt;/TPCOpId&gt;<br>
+    &lt;/KVMessage&gt;
+  </li>
+  <li><strong>2PC Acknowledgement:</strong><br>
+    &lt;?xml version="1.0" encoding="UTF-8"?&gt;<br>
+    &lt;KVMessage type="ack"&gt;<br>
+    &lt;TPCOpId&gt;2PC Operation ID&lt;/TPCOpId&gt;<br>
+    &lt;/KVMessage&gt;
+  </li>
+</ul>
+
+<h3>Registration Messages</h3>
+<ul>
+  <li><strong>Register:</strong><br>
+    &lt;?xml version="1.0" encoding="UTF-8"?&gt;<br>
+    &lt;KVMessage type="register"&gt;<br>
+    &lt;Message&gt;SlaveServerID@HostName:Port&lt;/Message&gt;<br>
+    &lt;/KVMessage&gt;
+  </li>
+  
+  <li><strong>Registration ACK:</strong><br>
+    &lt;?xml version="1.0" encoding="UTF-8"?&gt;<br>
+    &lt;KVMessage type="resp"&gt;<br>
+    &lt;Message&gt;Successfully registered  SlaveServerID@HostName:Port&lt;/Message&gt;<br>
+    &lt;/KVMessage&gt;
+  </li>  
+</ul>
+
+<h3>KVMessage with Multiple Error Messages</h3>
+<ul>
+  <li>Multiple error messages in case of an abort should be placed
+in the same Message field of a "resp" message prefixed by
+"@SlaveServerID:=" and separated by the newline character ('\n').
+Example: <br>
+    &lt;?xml version="1.0" encoding="UTF-8"?&gt;<br>
+    &lt;KVMessage type="resp"&gt;<br>
+    &lt;Message&gt;@SlaveServerID1:=ErrorMessage1\n@SlaveServerID2:=ErrorMessage2&lt;/Message&gt;<br>
+    &lt;/KVMessage&gt;    
+  </li>
+</ul>
+
+<h3>The <tt>ignoreNext</tt> Message</h3>
+<p>Testing distributed systems is hard, more so in presence of
+failures. To make it slightly easier, we are introducing
+the <tt>ignoreNext</tt> message that will be issued directly to the
+slave server by the autograder. Upon reception of this message, the
+slave server will ignore the next 2PC operation (either a PUT or a
+DEL) and respond back with a failure message during the first phase of
+2PC. This will cause the 2PC operation to fail and the failure code
+path will be triggered. You need not implement the <span style="font-family: monospace;">ignoreNext</span>
+message forwarding logic in the TPCMaster (we will not send the message
+to the TPCMaster). The ignoreNext will be sent to the appropriate slave
+servers directly by our testing code. You do not need to maintain ignoreNext status on reboots.
+If a slave server receives an ignoreNext message, then restarts before the next TPC operation,
+the next TPC operation can be processed instead of ignored.<br>
+</p>
+<ul>
+  <li><strong><tt>ignoreNext</tt> KVMessage/TPCMessage:</strong><br>
+    &lt;?xml version="1.0" encoding="UTF-8"?&gt;<br>
+    &lt;KVMessage type="ignoreNext"/&gt;<br>
+  </li>
+  <li><strong><tt>ignoreNext</tt> ACK:</strong><br>
+    &lt;?xml version="1.0" encoding="UTF-8"?&gt;<br>
+    &lt;KVMessage type="resp"&gt;<br>
+    &lt;Message&gt;Success&lt;/Message&gt;<br>
+    &lt;/KVMessage&gt;
+  </li>
+</ul>
+
+<h3>Error messages in Addition to Project 3</h3>
+<ul>
+  <li>"Registration Error: Received unparseable slave information"
+-- Registration information was not in "slaveID@hostName:port" format.</li>
+  <li>"IgnoreNext Error: SlaveServer <em>SlaveServerID</em> has ignored this 2PC request during the first phase" -- Error message from the first phase corresponding to an <tt>ignoreNext</tt> message
+  </li>
+</ul>
+
+<h3>Concepts You are Expected to Learn</h3>
+<ul>
+  <li>Two-Phase Commit</li>
+  <li>Logging and Recovery using Logs</li>
+  <li>Consistent Hashing</li>
+  <li>Failure Detection using Timeouts</li>
+</ul>
+
+
+</body></html>

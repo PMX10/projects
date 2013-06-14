@@ -1,0 +1,24 @@
+a)
+-We generate a private key, email.priv, using "openssl genrsa -out email.priv 2048"
+-Next, we generate a csr with 2048 bits, email.req, using "openssl req -newkey rsa:2048 -keyout email.priv -nodes -out email.req"
+-For the common name, we entered "email.gov-of-caltopia.info"
+-We navigate to the digipwntar folder and sign the certificate with the command, 
+"./sign email.req email.x509" 
+-The new certificate will be stored in email.x509
+-We can run "openssl x509 -in email.x509 -text" to inspect the certificate 
+-After creating the certificate, we ran wireshark on eth0 to get information about the DNS packets 
+-From wireshark, we are able to see the request packet from the governor to the server
+-The IP address of the governor is 10.87.51.131, and the address of email.gov-of-caltopia.info is 8.8.8.8
+-We can also view the contents of various layers in the DNS packet to aid us in recreating a new packet of our own
+-With those information, we build a new DNS packet and spoof as email.gov-of-caltopia.info and send the modified packet to the governor
+-We set a condition such that we will only create a new DNS packet and send it to the governor if we received a DNS packet with a destination to 
+8.8.8.8 and a source from 10.87.51.131 and the DNS packet's query name is "email.gov-of-caltopia.info."
+-For rdata, we entered our own ip_address, which is 10.87.51.132, such that the response packet will be redirected to our ip_address
+-After all the modifications, we navigate to pcap_tool folder and run "./pcap_tool.py" so that it will start the spoofing of the DNS packets
+-Finally, we open a new terminal and navigated to local_webserver folder and run "./local_webserver email.x509 email.priv" 
+-When the governor got spoofed and entered his username and password, the information will be sent to our ip_address and his username, password, 
+and other information will be printed out onto our terminal 
+
+b) 
+It's possible for Governor or Sylvester Stalloon to detect and defend against the attack. 
+They can use a different CA other than DigiPwntar. Once the CA is switched, the DNS packet sent from the attacker is no longer valid because the authentication has changed. Since the Governor and Sylvester Stalloon no longer trusts DigiPwntar, any packets signed by it will cause the browser to pop up a warning. 

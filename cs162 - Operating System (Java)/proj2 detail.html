@@ -1,0 +1,408 @@
+<html>
+
+<head>
+<title>CS 162 Project Phase 2</title>
+</head>
+
+<body bgcolor="#FFFFFF">
+
+<center><h2>Phase 2: Multiprogramming</h2></center>
+
+<p>
+The second phase of Nachos is to support multiprogramming.
+As in the first assignment, we give you some of the
+code you need; your job is to complete the system and enhance it. Up
+to now, all the code you have written for Nachos has been part of the
+operating system kernel. In a real operating system, the kernel not
+only uses its procedures internally, but allows user-level programs 
+to access some of its routines them via <i>system calls</i>.
+
+<p>
+The first step is to read and understand the part of the system we
+have written for you. The kernel files are in the <tt>nachos.userprog</tt>
+package, and there are a few additional machine simulation classes that get
+used:
+<ul>
+<li><tt>Processor</tt> simulates a MIPS processor.
+<li><tt>SerialConsole</tt> simulates a serial console (for keyboard input and
+text output).
+<li><tt>FileSystem</tt> is a file system interface. To access files, use the
+<tt>FileSystem</tt> returned by <tt>Machine.stubFileSystem()</tt>. This file
+system accesses files in the <tt>test</tt> directory.
+</ul>
+
+
+<p>
+The new kernel files for this assignment include:
+<ul>
+<li><tt>UserKernel.java</tt> - a multiprogramming kernel.
+<li><tt>UserProcess.java</tt> - a user process; manages the address space, and
+loads a program into virtual memory.
+<li><tt>UThread.java</tt> - a thread capable of executing user MIPS code.
+<li><tt>SynchConsole.java</tt> - a synchronized console; makes it possible to
+share the machine's serial console among multiple threads.
+</ul>
+
+<p>
+In this assignment we are giving you a simulated CPU that models a real CPU
+(a MIPS R3000 chip). By simulating the execution, we have complete control
+over how many instructions are executed at a time, how the address translation
+works, and how interrupts and exceptions (including system calls) are handled.
+Our simulator can run normal programs compiled from C to the MIPS instruction
+set. The only caveat is that floating point operations are not supported.
+
+<p>
+The code we provide can run a single user-level MIPS program at a time,
+and supports just one system call: <tt>halt</tt>. All <tt>halt</tt>
+does is ask the operating system to shut the machine down. This test
+program is found in <tt>test/halt.c</tt> and represents the simplest
+supported MIPS program. 
+
+
+<p>
+We have provided several other example MIPS programs
+in the <tt>test</tt> directory of the Nachos distribution. You can use
+these programs to test your implementation, or you can write new
+programs. Of course, you won't be able to run the programs which make
+use of features such as I/O until you implement the appropriate
+kernel support! That will be your task in this project.
+
+<p>
+The <tt>test</tt> directory
+includes C source files (<tt>.c</tt> files) and Nachos user program binaries
+(<tt>.coff</tt> files). The binaries can be built while in the <tt>test</tt>
+directory by running <tt>gmake</tt>, or from the <tt>proj2</tt> 
+directory by running <tt>gmake test</tt>.
+
+<p>
+To run the <tt>halt</tt> program, go to the <tt>test</tt> directory 
+and <tt>gmake</tt>; then go to the
+<tt>proj2</tt> directory, <tt>gmake</tt>, and run <tt>nachos -d ma</tt>.
+Trace what happens as the user program gets loaded, runs, and invokes a system
+call (the <tt>'m'</tt> debug flag enables MIPS disassembly, and the
+<tt>'a'</tt> debug flag prints process loading information).
+
+
+<p>
+In order to compile the test programs, you need a MIPS
+<b>cross-compiler</b>. This is already installed on the instructional
+machines as <tt>mips-gcc</tt> (see the <tt>Makefile</tt> in the
+<tt>test</tt> directory for details). If you are not using an 
+instructional machine, you must <a href="xgcc.html">download the appropriate 
+cross-compiler</a> and set the ARCHDIR
+environment variable accordingly. 
+
+<p>
+There are multiple stages to building a Nachos-compatible
+MIPS binary (all of which are handled by the <tt>test Makefile</tt>):
+<ol>
+<li>Source files (<tt>*.c</tt>) are compiled into object files (<tt>*.o</tt>)
+by <tt>mips-gcc</tt>.
+<li>Some of the object files are linked into <tt>libnachos.a</tt>, the Nachos
+standard library.
+<li><tt>start.s</tt> is preprocessed and assembled into <tt>start.o</tt>.
+This file contains the assembly-language code to initialize a process.
+It also provides the <b>system call "stub code"</b> which allows
+system calls to be invoked. This makes use of the special MIPS
+instruction <tt>syscall</tt> which traps to the Nachos kernel to 
+invoke a system call.
+<li>An object file is linked with <tt>libnachos.a</tt> to produce a 
+Nachos-compatible MIPS binary, which has the extension <tt>*.coff</tt>.  
+(COFF stands for Common Object File Format and is an industry-standard 
+binary format which the Nachos kernel understands.)
+<li>Note that if you create a new test file (*.c), you will need to append your program name to the variable TARGETS in the Makefile inside test directory 
+</ol>
+
+<p>
+You can run other test programs by running
+<pre>
+  nachos -x PROGNAME.coff
+</pre>
+where <tt>PROGNAME.coff</tt> is the name of the MIPS program binary
+in the <tt>test</tt> directory. Feel free to write your own C test 
+programs -- in fact, you will need to do so for testing your own code!
+
+<p>
+<b>As with Phase 1, you should submit and document your test cases (for 
+both the Java and C components of your code) with the project.</b>
+For this project most test cases will be implemented as C programs
+which test your system calls, but some "internal" testing in Java
+may be possible as well.
+
+<p><hr><p>
+
+<ol type=I>
+
+<p><li>
+(30%, 125 lines) Implement the file system calls (<tt>creat</tt>,
+<tt>open</tt>, <tt>read</tt>, <tt>write</tt>, <tt>close</tt>, and
+<tt>unlink</tt>, documented in <tt>syscall.h</tt>). You will see the
+code for <tt>halt</tt> in <tt>UserProcess.java</tt>; it is best for
+you to place your new system calls here too. Note that you are
+<i>not</i> implementing a file system; rather, you are simply giving
+user processes the ability to access a file system that we have
+implemented for you. 
+
+<ul type=disc>
+<p>
+<li>We have provided you the assembly code necessary to invoke 
+system calls from user programs (see <tt>start.s</tt>; 
+the <tt>SYSCALLSTUB</tt> macro generates assembly code for each syscall).
+
+<p>
+<li>You will need to <i>bullet-proof</i> the Nachos kernel from
+user program errors; there should be nothing a user program can do
+to crash the operating system (with the exception of explicitly invoking the
+<tt>halt()</tt> syscall). In other words, you must be sure that user
+programs do not pass bogus arguments to the kernel which causes
+the kernel to corrupt its internal state or that of other processes.
+Also, you must take steps to ensure that if a user process does anything
+illegal -- causing the Processor to throw an exception --  that the process will be killed cleanly and its resources freed. 
+
+<p>
+<li>
+You should make it so that the <tt>halt()</tt> system call can only 
+be invoked by the "root" process -- that is, the first process in the 
+system. If another process attempts to invoke <tt>halt()</tt>, 
+the system call should be ignored and return immediately.
+
+<p>
+<li> Since the memory addresses passed as arguments to the system calls
+are virtual addresses, you need to use 
+<tt>UserProcess.readVirtualMemory</tt> and
+<tt>UserProcess.writeVirtualMemory</tt> to transfer memory between
+the user process and the kernel. 
+
+<p>
+<li>User 
+processes store filenames and other string arguments as null-terminated 
+strings in their virtual address space. The maximum length of for strings
+passed as arguments to system calls is 256 bytes.
+
+<p>
+<li>When a system call wishes to indicate an error condition to the
+user, it should return -1 (<b>not</b> throw an exception within the
+kernel!). Otherwise, the system call should return the appropriate value 
+as documented in <tt>test/syscall.h</tt>.
+
+<p>
+<li>When any process is started, its file descriptors 0 and 1 must refer to
+standard input and standard output. Use <tt>UserKernel.console.openForReading()</tt>
+and <tt>UserKernel.console.openForWriting()</tt> to make this easier. A user process
+<i>is</i> allowed to close these descriptors, just like descriptors returned by
+<tt>open()</tt>.
+
+<p>
+<li>A stub file system interface to the UNIX file system is already
+provided for you; the interface is given by the class
+<tt>machine/FileSystem.java</tt>. You can access the stub filesystem
+through the static field <tt>ThreadedKernel.fileSystem</tt>. (Note that
+since <tt>UserKernel</tt> extends <tt>ThreadedKernel</tt>, you can 
+still access this field.) This filesystem is
+capable of accessing the <tt>test</tt> directory in your Nachos
+distribution, which is going to be useful when you want to support the
+<tt>exec</tt> system call (see below). You
+do not need to implement any file system functionality. You should 
+examine carefully the specifications for <tt>FileSystem</tt> and 
+<tt>StubFileSystem</tt> in order to determine what functionality you 
+should provide in your syscalls, and what is handled by the file system.
+
+<p>
+<li>Do not implement any kind of file locking; this is the file
+system's responsibility. If <tt>ThreadedKernel.fileSystem.open()</tt>
+returns a non-null <tt>OpenFile</tt>, then the user process is
+allowed to access the given file; otherwise, you should signal an
+error. Likewise, you do not need to worry about the details of what 
+happens if multiple processes attempt to access the same file at once;
+the stub filesystem handles these details for you. 
+
+<p>
+<li>Your implementation should support up to 16 concurrently open files 
+per process, including stdin and stdout.
+Each file that a process has opened should have a unique 
+<em>file descriptor</em> associated with it (see <tt>syscall.h</tt> 
+for details). The file descriptor should be a non-negative integer that 
+is simply used to index into a table of currently-open files by that
+process. Note that a given file descriptor can be reused if the file
+associated with it is closed, and that different processes can use the
+same file descriptor (i.e. integer) to refer to different files.
+</ul>
+
+<p><li>
+(25%, 100 lines) Implement support for multiprogramming. The code we
+have given you is restricted to running one user process at a time;
+your job is to make it work for multiple user processes.
+
+<ul type=disc>
+<p>
+<li> Come up with a way of allocating the machine's
+physical memory so that different processes do not overlap in their
+memory usage. 
+Note that the user programs do not make use of <tt>malloc()</tt> or
+<tt>free()</tt>, meaning that user programs effectively have no
+dynamic memory allocation needs (and therefore, no heap). What this
+means is that you know the complete memory needs of a process when
+it is created. You can allocate a fixed number of pages for the 
+processe's stack; 8 pages should be sufficient.
+
+
+<p>
+We suggest maintaining 
+a global linked list of free physical pages (perhaps as part of the 
+<tt>UserKernel</tt> class). Be sure to use synchronization where 
+necessary when accessing this list.  
+Your solution must make <b>efficient</b> use of memory by allocating
+pages for the new process wherever possible. This means that it is
+<b>not</b> acceptable to only allocate pages in a contiguous block;
+your solution must be able to make use of "gaps" in the free memory pool.
+
+<p>
+Also be sure that all of a process's memory is freed on exit
+(whether it exits normally, via the syscall <tt>exit()</tt>, or
+abnormally, due to an illegal operation).
+
+<p>
+<li>Modify <tt>UserProcess.readVirtualMemory</tt> and
+<tt>UserProcess.writeVirtualMemory</tt>, which copy data between
+the kernel and the user's virtual address space, so that they work
+with multiple user processes. 
+
+<p>
+The physical memory of the MIPS machine is accessed
+through the method <tt>Machine.processor().getMemory()</tt>;
+the total number of physical pages is
+<tt>Machine.processor().getNumPhysPages()</tt>. You should maintain
+the <tt>pageTable</tt> for each user process, which maps the
+user's virtual addresses to physical addresses. The
+<tt>TranslationEntry</tt> class represents a single virtual-to-physical
+page translation.
+
+<p>
+The field <tt>TranslationEntry.readOnly</tt> should be set to
+<tt>true</tt> if the page is coming from a COFF section which
+is marked as read-only. You can determine this using the method
+<tt>CoffSection.isReadOnly()</tt>.
+
+<p>
+Note that these methods should not throw exceptions when they fail;
+instead, they must always return the number of bytes transferred (even
+if that number is zero).
+
+
+<p>
+<li>Modify <tt>UserProcess.loadSections()</tt> 
+so that it allocates the number of pages that it needs (that is, based
+on the size of the user program), using the allocation policy that you
+decided upon above. This method should also set up the <tt>pageTable</tt> 
+structure for the process so that the process is loaded into the 
+correct physical memory pages.
+If the new user process cannot fit into physical memory,
+<tt>exec()</tt> should return an error.
+
+<p>
+<p>Note that the user threads (see the <tt>UThread</tt> class) already save
+and restore user machine state, as well as process state, on context switches.
+So, you are not responsible for these details.
+</ul>
+
+<p><li>
+(30%, 125 lines) Implement the system calls (<tt>exec</tt>,
+<tt>join</tt>, and <tt>exit</tt>, also documented in <tt>syscall.h</tt>).
+<p>
+<ul type=disc>
+<li>Again, all the addresses passed in registers to <tt>exec</tt> and
+<tt>join</tt> are virtual addresses. You should use <tt>readVirtualMemory</tt>
+and <tt>readVirtualMemoryString</tt> to transfer memory between
+the kernel and the user process. 
+<p>
+<li>Again, you must bullet-proof these syscalls.
+<p><li> Note that the state of the child process is entirely private to
+this process. This means that the parent and child do not directly share
+memory or file descriptors. Note that two processes can
+of course open the same file; for example, all processes should have 
+file descriptors 0 and 1 mapped to the system console, as described
+above.
+
+<p>
+<li>Unlike <tt>KThread.join()</tt>, only a process's parent can join to it.
+For instance, if A executes B and B executes C, A is not allowed to join to C,
+but B <i>is</i> allowed to join to C.
+
+<p>
+<li><tt>join</tt> takes a <em>process ID</em> as an argument, used to 
+uniquely identify the child process which the parent wishes to join with.
+The process ID should be a <b>globally unique positive integer</b>,
+assigned to each process when it is created. (Although for this project
+the only use of the process ID is in <tt>join</tt>, for later project
+phases it is important that the process ID is unique across all running
+processes in the system.) The easiest way of accomplishing this is to 
+maintain a static counter which indicates the next process ID to assign.
+Since the process ID is an <tt>int</tt>, then it may be possible for this
+value to overflow if there are many processes in the system. For this
+project you are not expected to deal with this case; that is, assume
+that the process ID counter will not overflow.
+
+<p>
+<li>When a process calls <tt>exit()</tt>, its thread should be terminated
+immediately, and the process should clean up any state associated with
+it (i.e. free up memory, close open files, etc). Perform the same
+cleanup if a process exits abnormally.
+
+<p><li>The exit status of the exiting process should be transferred
+to the parent, in case the parent calls the <tt>join</tt> system
+call. The exit status of a process that exits abnormally is up to you. For 
+the purposes of <tt>join</tt>, a child process exits normally if it 
+calls the <tt>exit</tt> syscall with any status, and abnormally if the 
+kernel kills it (e.g. due to an unhandled exception).
+    
+<p>
+<li>The last process to call <tt>exit()</tt> should cause the 
+machine to halt by calling <tt>Kernel.kernel.terminate()</tt>. (Note that 
+only the root process should be allowed to invoke the <tt>halt()</tt> 
+<b>system call</b>, but the last exiting process should call 
+<tt>Kernel.kernel.terminate()</tt> <b>directly</b>.)
+
+</ul>
+
+<p><li>
+(15%, 50 lines+existing priority scheduler) Implement a lottery scheduler
+(place it in <tt>threads/LotteryScheduler.java</tt>). 
+Note that this class extends <tt>PriorityScheduler</tt>, you should
+be able to reuse most of the functionality of that class; the 
+lottery scheduler should not be a large amount of additional code.
+The only major difference is the
+mechanism used to pick a thread from a queue: a lottery is held, instead of
+just picking the thread with the most priority. Your lottery
+scheduler should implement priority donation. (Note that since this is a
+lottery scheduler, priority inversion can't actually lead to starvation!
+However, your scheduler must do priority donation anyway.)
+<ul type=disc>
+<p>
+<li>In a lottery scheduler, instead of donating priority, waiting threads
+<i>transfer tickets</i> to threads they wait for. Unlike a standard
+priority scheduler, a waiting thread always adds its ticket count to the
+ticket count of the queue owner; that is, the owner's ticket count is
+the <b>sum</b> of its own tickets and the tickets of all waiters, 
+not the <b>max</b>. Be sure to implement this correctly.
+<p>
+<li>Your solution should work even if there are billions of tickets
+in the system (i.e. do not keep an array containing an entry for every
+ticket).
+
+<p><li> When <tt>LotteryScheduler.increasePriority()</tt> is called,
+the number of tickets held by a process should be incremented by one.
+Similarly, for <tt>decreasePriority()</tt>, the number should be 
+decremented by one.
+
+<p><li> The total number of (real) tickets in the system is guaranteed not 
+to exceed <tt>Integer.MAX_VALUE</tt>.  The maximum individual priority is 
+now also <tt>Integer.MAX_VALUE</tt>, rather than 7 
+(<tt>PriorityScheduler.priorityMaximum</tt>).  If you wish, you may also 
+assume that the minimum priority is increased to 1 (from 0).
+
+</ul>
+
+</ol>
+
+</body>
+</html>

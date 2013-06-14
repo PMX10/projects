@@ -1,0 +1,2 @@
+hash1:
+tableSize:1040Time to hash 25143 words is 39 milliseconds.Hashtable@1b67f74

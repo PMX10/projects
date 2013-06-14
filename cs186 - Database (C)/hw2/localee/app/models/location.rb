@@ -1,0 +1,18 @@
+class Location < ActiveRecord::Base
+  attr_accessible :latitude, :longitude, :name
+  validates :name, :presence => true#, :length => {:minimum => 2}
+  validates :latitude, :presence => true
+  validates :longitude, :presence => true
+  has_many :posts
+  has_many :follows
+  ###### not belong to user
+
+  #def to_hash
+  #  {
+  #    :id => self.id,
+  #    :name => self.name,
+  #    :latitude => self.latitude,
+  #    :longitude => self.longitude
+  #  }
+  #end
+end
